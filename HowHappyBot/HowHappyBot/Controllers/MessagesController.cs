@@ -26,60 +26,66 @@ namespace HowHappyBot
         /// </summary>
         public async Task<HttpResponseMessage> Post([FromBody]Activity activity)
         {
-            if (activity.Type == ActivityTypes.Message)
+            try
             {
-                ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
-                StateClient stateClient = activity.GetStateClient();
-                BotData conversationData = await stateClient.BotState.GetConversationDataAsync(activity.ChannelId, activity.From.Id);
-
-                // if there is an attachment, save it/overwrite the saved on and analyse it
-                if (activity.Attachments.Count > 0)
+                if (activity.Type == ActivityTypes.Message)
                 {
-                    //save the attachment
-                    await BotStateService.SaveAttachmentToConversation(activity, connector);
+                    ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
+                    StateClient stateClient = activity.GetStateClient();
+                    BotData conversationData = await stateClient.BotState.GetConversationDataAsync(activity.ChannelId, activity.From.Id);
 
-                    // return our reply to the user
-                    Activity replyThanks = activity.CreateReply($"Thanks for the attachment. I've saved it.");
-                    await connector.Conversations.ReplyToActivityAsync(replyThanks);
-                }
+                    // if there is an attachment, save it/overwrite the saved on and analyse it
+                    if (activity.Attachments.Count > 0)
+                    {
+                        //save the attachment
+                        await BotStateService.SaveAttachmentToConversation(activity, connector);
+                    }
 
-                //check if we have a saved attachment to work with
-                var imageBytes = await BotStateService.GetByteArrayProperty(activity, connector, "image");
+                    //check if we have a saved attachment to work with
+                    var imageBytes = await BotStateService.GetByteArrayProperty(activity, connector, "image");
 
-                if (imageBytes != null)
-                {
-                    //get face data
-                    List<Face> faces = await EmotionAPIService.GetEmotionData(imageBytes);
+                    if (imageBytes != null)
+                    {
+                        //get face data
+                        List<Face> faces = await EmotionAPIService.GetEmotionData(imageBytes);
 
-                    // return our reply to the user
-                    Activity replyJson = activity.CreateReply($"face 1 happiness {faces.FirstOrDefault().scores.happiness}");
-                    await connector.Conversations.ReplyToActivityAsync(replyJson);
+                        // return our reply to the user
+                        var roundedScore = Math.Round(faces.FirstOrDefault().scores.happiness, 2);
+                        var scoreLabel = (roundedScore < 0.01) ?
+                            "not" :
+                            string.Format("{0:#%}", faces.FirstOrDefault().scores.happiness);
+                        Activity replyJson = activity.CreateReply($"This face is {scoreLabel} happy");
+                        await connector.Conversations.ReplyToActivityAsync(replyJson);
 
-                    //send image back to users
-                    var message = activity.CreateReply("");
-                    message.Type = "message";
+                        //send image back to users
+                        var message = activity.CreateReply("");
+                        message.Type = "message";
 
-                    message.Attachments = new List<Attachment>();
-                    var image = "data:image/png;base64," + Convert.ToBase64String(imageBytes);
-                    message.Attachments.Add(new Attachment { ContentUrl = image, ContentType = "image/png" });
-                    await connector.Conversations.ReplyToActivityAsync(message);
+                        message.Attachments = new List<Attachment>();
+                        var image = "data:image/png;base64," + Convert.ToBase64String(imageBytes);
+                        message.Attachments.Add(new Attachment { ContentUrl = image, ContentType = "image/png" });
+                        await connector.Conversations.ReplyToActivityAsync(message);
+                    }
+                    else
+                    {
+                        // return our reply to the user
+                        Activity reply = activity.CreateReply($"No attachment. I can't work in these conditions!");
+                        await connector.Conversations.ReplyToActivityAsync(reply);
+                    }
+
                 }
                 else
                 {
-                    // return our reply to the user
-                    Activity reply = activity.CreateReply($"No attachment. I can't work in these conditions!");
-                    await connector.Conversations.ReplyToActivityAsync(reply);
+                    HandleSystemMessage(activity);
                 }
-
-
-
+                var response = Request.CreateResponse(HttpStatusCode.OK);
+                return response;
             }
-            else
+            catch (Exception ex)
             {
-                HandleSystemMessage(activity);
+                var response = Request.CreateResponse(HttpStatusCode.InternalServerError, ex.Message);
+                return response;
             }
-            var response = Request.CreateResponse(HttpStatusCode.OK);
-            return response;
         }
 
 

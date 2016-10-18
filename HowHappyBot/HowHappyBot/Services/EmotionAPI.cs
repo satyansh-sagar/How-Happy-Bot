@@ -22,24 +22,26 @@ namespace HowHappyBot.Services
 
         public static async Task<List<Face>> GetEmotionData(byte[] sourceImage)
         {
-            //convert saved bytes to a stream
-            var imageStream = new MemoryStream(sourceImage);
-
-            //call emotion api
             var responseString = string.Empty;
-            using (var httpClient = new HttpClient())
+
+            //convert saved bytes to a stream
+            using (var imageStream = new MemoryStream(sourceImage))
             {
-                //setup HttpClient with content
-                httpClient.BaseAddress = new Uri(_emotionApiUrl);
-                httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _emotionApiKey);
-                var content = new StreamContent(imageStream);
-                content.Headers.ContentType = new MediaTypeWithQualityHeaderValue("application/octet-stream");
+                //call emotion api
+                using (var httpClient = new HttpClient())
+                {
+                    //setup HttpClient with content
+                    httpClient.BaseAddress = new Uri(_emotionApiUrl);
+                    httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _emotionApiKey);
+                    var content = new StreamContent(imageStream);
+                    content.Headers.ContentType = new MediaTypeWithQualityHeaderValue("application/octet-stream");
 
-                //make request
-                var responseMessage = await httpClient.PostAsync(_emotionApiUrl, content);
+                    //make request
+                    var responseMessage = await httpClient.PostAsync(_emotionApiUrl, content);
 
-                //read response as a json string
-                responseString = await responseMessage.Content.ReadAsStringAsync();
+                    //read response as a json string
+                    responseString = await responseMessage.Content.ReadAsStringAsync();
+                }
             }
 
             //initialise faces

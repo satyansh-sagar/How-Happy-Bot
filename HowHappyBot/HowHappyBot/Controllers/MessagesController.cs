@@ -54,6 +54,15 @@ namespace HowHappyBot
                     // return our reply to the user
                     Activity replyJson = activity.CreateReply($"face 1 happiness {faces.FirstOrDefault().scores.happiness}");
                     await connector.Conversations.ReplyToActivityAsync(replyJson);
+
+                    //send image back to users
+                    var message = activity.CreateReply("");
+                    message.Type = "message";
+
+                    message.Attachments = new List<Attachment>();
+                    var image = "data:image/png;base64," + Convert.ToBase64String(imageBytes);
+                    message.Attachments.Add(new Attachment { ContentUrl = image, ContentType = "image/png" });
+                    await connector.Conversations.ReplyToActivityAsync(message);
                 }
                 else
                 {
